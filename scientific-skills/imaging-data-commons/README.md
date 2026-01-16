@@ -1,20 +1,23 @@
-# IDC Navigator
+# Imaging Data Commons
 
 A Claude skill for working with the National Cancer Institute Imaging Data Commons (IDC).
 
 ## Description
 
-Helps users discover, query, visualize, download, and use cancer imaging data from NCI Imaging Data Commons (IDC). Use when users ask to search IDC data, find imaging datasets by cancer type or modality, download DICOM files from IDC, visualize medical images from IDC, query IDC metadata, understand IDC licensing, or work with IDC tools (idc-index, Portal, BigQuery, SlicerIDCBrowser).
+Access NCI Imaging Data Commons for cancer imaging (95TB+ DICOM). Query by cancer type/modality, download series, visualize in browser, check licenses via idc-index/BigQuery.
 
 ## Installation
 
-This skill requires the `idc-index` Python package for basic functionality:
-
 ```bash
+# Core requirement
 pip install --upgrade idc-index
-```
 
-For advanced BigQuery functionality, you'll need Google Cloud SDK and a project with billing configured.
+# Recommended (for helper scripts and data analysis)
+pip install pandas numpy
+
+# Optional (for BigQuery access - requires GCP project with billing)
+# pip install google-cloud-bigquery db-dtypes
+```
 
 ## What This Skill Provides
 
@@ -48,12 +51,18 @@ Claude will automatically use this skill to help you work with IDC data.
 ## Structure
 
 ```
-idc-navigator/
-├── SKILL.md              # Main skill instructions
-└── references/           # Detailed reference documentation
-    ├── idc_index_api.md      # idc-index Python API reference
-    ├── bigquery_guide.md     # BigQuery usage guide
-    └── metadata_schema.md    # IDC metadata organization
+imaging-data-commons/
+├── SKILL.md                  # Main skill documentation with examples
+├── README.md                 # This file
+├── requirements.txt          # Python dependencies
+├── references/               # Detailed reference documentation
+│   ├── idc_index_api.md      # Complete idc-index API reference
+│   ├── bigquery_guide.md     # BigQuery usage and optimization
+│   └── metadata_schema.md    # IDC data hierarchy and fields
+└── scripts/                  # Helper Python scripts
+    ├── idc_client.py         # Simplified client wrapper
+    ├── idc_download.py       # Download utilities
+    └── idc_viewer.py         # Visualization helpers
 ```
 
 ## Resources

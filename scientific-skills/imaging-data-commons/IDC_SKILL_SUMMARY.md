@@ -1,8 +1,8 @@
-# IDC Navigator Skill - Summary
+# Imaging Data Commons Skill - Summary
 
 ## What This Skill Does
 
-The IDC Navigator skill helps users work with cancer imaging data from the National Cancer Institute Imaging Data Commons (IDC). It provides guidance on:
+The Imaging Data Commons skill helps users work with cancer imaging data from the National Cancer Institute Imaging Data Commons (IDC). It provides guidance on:
 
 1. **Discovering data** - Finding relevant cancer imaging datasets
 2. **Querying metadata** - Searching by cancer type, modality, body part, etc.
@@ -13,59 +13,74 @@ The IDC Navigator skill helps users work with cancer imaging data from the Natio
 
 ## Skill Organization (K-Dense Format)
 
-This skill is organized as a standard folder structure following the K-Dense claude-scientific-skills repository format:
+This skill follows the standard K-Dense claude-scientific-skills repository format:
 
 ```
-idc-navigator/
+imaging-data-commons/
+├── SKILL.md                  # Main skill documentation (core file)
 ├── README.md                 # Skill overview and installation
-├── SKILL.md                  # Main skill instructions (core file)
 ├── requirements.txt          # Python dependencies
-└── references/               # Detailed reference documentation
-    ├── idc_index_api.md         # idc-index Python API reference
-    ├── bigquery_guide.md        # BigQuery usage guide
-    └── metadata_schema.md       # IDC metadata organization
+├── IDC_SKILL_SUMMARY.md      # This file
+├── references/               # Detailed reference documentation
+│   ├── idc_index_api.md      # idc-index Python API reference
+│   ├── bigquery_guide.md     # BigQuery usage guide
+│   └── metadata_schema.md    # IDC metadata organization
+└── scripts/                  # Helper Python scripts
+    ├── idc_client.py         # Simplified client wrapper
+    ├── idc_download.py       # Download utilities
+    └── idc_viewer.py         # Visualization helpers
 ```
 
 ### Key Features of This Organization
 
 1. **Human-readable** - All files are plain text (Markdown, Python)
-2. **Standard structure** - Matches the K-Dense scientific-skills format
-3. **No packaging** - Direct folder structure, not a .skill zip file
-4. **Git-friendly** - Can be versioned and shared via GitHub
-5. **README included** - Standard documentation for GitHub/GitLab
+2. **Standard structure** - Matches the K-Dense scientific-skills format used by 140+ other skills
+3. **No nested directories** - Flat structure at `scientific-skills/imaging-data-commons/`
+4. **Helper scripts included** - Python utilities for common operations
+5. **Git-friendly** - Can be versioned and shared via GitHub
+6. **README included** - Standard documentation for GitHub/GitLab
 
 ## SKILL.md Structure
 
-The main SKILL.md contains:
-- YAML frontmatter with name and description
-- Tool selection guide (which tool for which task)
-- Common workflows with code examples
-- Quick reference for licenses
-- Links to detailed reference documentation
+The main SKILL.md follows the standard repository pattern with:
+- YAML frontmatter with name (`imaging-data-commons`), description, and metadata
+- Overview section (2-3 paragraphs)
+- "When to Use This Skill" section with use cases and comparisons
+- 9 numbered "Core Capabilities" sections with code examples
+- Common Use Cases (4 detailed workflows)
+- Best Practices section
+- Troubleshooting section
+- Helper Scripts documentation
+- Resources and links
 
 Key design decisions:
+- Comprehensive at ~700 lines (matching database skill standards)
 - Emphasizes idc-index for beginners (no Google Cloud setup needed)
 - Explains BigQuery is more powerful but requires billing
-- Provides concrete code examples users can copy
-- Short and focused (~160 lines)
+- Provides runnable code examples with inline comments
+- Progressive complexity from simple to advanced
 
 ## Reference Documentation
 
-Three detailed reference documents in `references/`:
+Three detailed reference documents in `references/` plus helper scripts in `scripts/`:
 
-**idc_index_api.md** (~200 lines)
+**idc_index_api.md** (~260 lines)
 - Complete API reference for the idc-index Python package
 - Installation and setup
 - All methods with parameters and examples
 - Common usage patterns
 - Command-line interface
+- Troubleshooting section
+- Links to helper scripts
 
-**bigquery_guide.md** (~180 lines)  
+**bigquery_guide.md** (~310 lines)
 - When and why to use BigQuery
 - Prerequisites (Google account, billing)
 - Dataset and table structure
 - Common query patterns
-- Cost considerations
+- Query optimization tips
+- Cost considerations and estimation
+- Common errors and solutions
 - Integration with idc-index
 
 **metadata_schema.md** (~190 lines)
@@ -74,6 +89,11 @@ Three detailed reference documents in `references/`:
 - Modality-specific fields (CT, MR, etc.)
 - License and provenance fields
 - Common metadata queries
+
+**Helper Scripts** (~330 lines total)
+- `idc_client.py` - Simplified wrapper with convenience methods
+- `idc_download.py` - Download utilities with size estimation
+- `idc_viewer.py` - Visualization URL generators and browser integration
 
 ## Usage in Claude
 

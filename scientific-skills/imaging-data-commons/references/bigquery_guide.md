@@ -255,7 +255,54 @@ Not all collections have clinical data. Started in IDC v11.
 
 - Tables are read-only (public dataset)
 - Schema changes between IDC versions
-- Use versioned datasets for reproducibility  
+- Use versioned datasets for reproducibility
 - Some DICOM sequences >15 levels deep are not extracted
 - Very large sequences (>1MB) may be truncated
 - Always check data license before use
+
+## Query Optimization Tips
+
+**Cost Optimization:**
+- Use `SELECT` only the columns you need (not `SELECT *`)
+- Filter early with `WHERE` clauses to reduce data scanned
+- Use `LIMIT` when testing queries
+- Check query cost before running: `client.query(query).total_bytes_processed`
+- Use clustering and partitioning features when available
+
+**Performance Optimization:**
+- Use materialized tables instead of views
+- Avoid complex JOIN operations when possible
+- Pre-filter data before JOINs
+- Use approximate aggregation functions when exact counts aren't needed
+
+## Common Errors
+
+**Issue: Billing must be enabled**
+- Cause: BigQuery requires a billing-enabled GCP project
+- Solution: Enable billing in Google Cloud Console or use idc-index mini-index instead
+
+**Issue: Query exceeds resource limits**
+- Cause: Query scans too much data or is too complex
+- Solution: Add more specific WHERE filters, use LIMIT, break into smaller queries
+
+**Issue: Column not found**
+- Cause: Field name typo or not in selected table
+- Solution: Check table schema first with `INFORMATION_SCHEMA.COLUMNS`
+
+**Issue: Permission denied**
+- Cause: Not authenticated to Google Cloud
+- Solution: Run `gcloud auth application-default login` or set GOOGLE_APPLICATION_CREDENTIALS
+
+## Cost Estimation
+
+BigQuery charges for data scanned:
+- First 1 TB per month: Free
+- After that: $5 per TB scanned
+- Storage: $0.02 per GB per month (unlikely to apply for read-only access)
+
+**Example costs:**
+- Simple query scanning 10 GB: Free (under 1 TB monthly limit)
+- Complex query scanning 500 GB: Free (under 1 TB monthly limit)
+- Multiple queries totaling 2 TB in a month: ~$5
+
+**Tip:** Most users stay within free tier limits with careful query design.

@@ -237,3 +237,27 @@ downloadDir/
 - Downloads use s5cmd for efficiency
 - Mini-index contains core metadata; use BigQuery for comprehensive queries
 - All data is in DICOM format
+
+## Troubleshooting
+
+**Issue: Downloads fail with connection errors**
+- Cause: Network issues or s5cmd problems
+- Solution: Check network, retry download, or download in smaller batches
+
+**Issue: SQL query syntax errors**
+- Cause: Incorrect SQL syntax or field names
+- Solution: Verify field names against mini-index schema, test with LIMIT 5 first
+
+**Issue: Empty results from query**
+- Cause: No data matches filters, or incorrect field values
+- Solution: Broaden query criteria, check valid values for fields (e.g., Modality = 'CT' not 'ct')
+
+## Helper Scripts
+
+The IDC skill provides helper scripts that wrap idc-index with convenience methods:
+
+- **`scripts/idc_client.py`** - Simplified client with methods like `search_by_cancer_type()`, `search_by_modality()`
+- **`scripts/idc_download.py`** - Download utilities with size estimation and batch processing
+- **`scripts/idc_viewer.py`** - Visualization helpers for generating viewer URLs
+
+See main SKILL.md for usage examples of helper scripts.
