@@ -5,10 +5,10 @@
 
 A comprehensive collection of **140 ready-to-use scientific skills** for Claude, created by [K-Dense](https://k-dense.ai). Transform Claude into your AI research assistant capable of executing complex multi-step scientific workflows across biology, chemistry, medicine, and beyond.
 
-**Looking for the full AI co-scientist experience?** Try [K-Dense Web](https://app.k-dense.ai) for 200+ skills, cloud compute, and publication-ready outputs.
+**Looking for the full AI co-scientist experience?** Try [K-Dense Web](https://k-dense.ai) for 200+ skills, cloud compute, and publication-ready outputs.
 
 <p align="center">
-  <a href="https://app.k-dense.ai">
+  <a href="https://k-dense.ai">
     <img src="docs/k-dense-web.gif" alt="K-Dense Web Demo" width="800"/>
   </a>
 </p>
@@ -17,7 +17,7 @@ A comprehensive collection of **140 ready-to-use scientific skills** for Claude,
 
 ## K-Dense Web - The Full Experience
 
-Want 10x the power with zero setup? **[K-Dense Web](https://app.k-dense.ai)** is the complete AI co-scientist platform—everything in this repo, plus:
+Want 10x the power with zero setup? **[K-Dense Web](https://k-dense.ai)** is the complete AI co-scientist platform—everything in this repo, plus:
 
 | Feature | This Repo | K-Dense Web |
 |---------|-----------|-------------|
@@ -32,9 +32,9 @@ Want 10x the power with zero setup? **[K-Dense Web](https://app.k-dense.ai)** is
 
 **Get $50 in free credits** — no credit card required.
 
-<a href="https://app.k-dense.ai"><img src="https://img.shields.io/badge/Try_K--Dense_Web-Start_Free-blue?style=for-the-badge&logo=data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyNCIgaGVpZ2h0PSIyNCIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSJub25lIiBzdHJva2U9IndoaXRlIiBzdHJva2Utd2lkdGg9IjIiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCI+PHBhdGggZD0iTTUgMTJoMTQiLz48cGF0aCBkPSJtMTIgNSA3IDctNyA3Ii8+PC9zdmc+" alt="Try K-Dense Web"></a>
+<a href="https://k-dense.ai"><img src="https://img.shields.io/badge/Try_K--Dense_Web-Start_Free-blue?style=for-the-badge&logo=data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyNCIgaGVpZ2h0PSIyNCIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSJub25lIiBzdHJva2U9IndoaXRlIiBzdHJva2Utd2lkdGg9IjIiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCI+PHBhdGggZD0iTTUgMTJoMTQiLz48cGF0aCBkPSJtMTIgNSA3IDctNyA3Ii8+PC9zdmc+" alt="Try K-Dense Web"></a>
 
-*Learn more at [k-dense.ai](https://k-dense.ai)*
+*Learn more at [k-dense.ai](https://k-dense.ai)* | *[Read our detailed comparison →](https://k-dense.ai/blog/k-dense-web-vs-claude-scientific-skills)*
 
 ---
 
@@ -88,7 +88,8 @@ Each skill includes:
 - [Getting Started](#getting-started)
   - [Claude Code](#claude-code-recommended)
   - [Cursor IDE](#cursor-ide)
-  - [Any MCP Client](#any-mcp-client)
+  - [Any MCP Client](#any-mcp-client-not-for-claude-code)
+- [Support Open Source](#-support-the-open-source-community)
 - [Prerequisites](#prerequisites)
 - [Quick Examples](#quick-examples)
 - [Use Cases](#use-cases)
@@ -213,6 +214,21 @@ https://mcp.k-dense.ai/claude-scientific-skills/mcp
 
 **Option 2: Self-Hosted** (More Control)
 🔗 **[claude-skills-mcp](https://github.com/K-Dense-AI/claude-skills-mcp)** - Deploy your own MCP server
+
+---
+
+## ❤️ Support the Open Source Community
+
+Claude Scientific Skills is powered by **50+ incredible open source projects** maintained by dedicated developers and research communities worldwide. Projects like Biopython, Scanpy, RDKit, scikit-learn, PyTorch Lightning, and many others form the foundation of these skills.
+
+**If you find value in this repository, please consider supporting the projects that make it possible:**
+
+- ⭐ **Star their repositories** on GitHub
+- 💰 **Sponsor maintainers** via GitHub Sponsors or NumFOCUS
+- 📝 **Cite projects** in your publications
+- 💻 **Contribute** code, docs, or bug reports
+
+👉 **[View the full list of projects to support](docs/open-source-sponsors.md)**
 
 ---
 
@@ -550,8 +566,8 @@ We welcome contributions to expand and improve this scientific skills repository
 
 ### Contribution Guidelines
 
+✅ **Adhere to the [Agent Skills Specification](https://agentskills.io/specification)** — Every skill must follow the official spec (valid `SKILL.md` frontmatter, naming conventions, directory structure)  
 ✅ Maintain consistency with existing skill documentation format  
-✅ Include practical, working examples in all contributions  
 ✅ Ensure all code examples are tested and functional  
 ✅ Follow scientific best practices in examples and workflows  
 ✅ Update relevant documentation when adding new capabilities  
@@ -566,6 +582,10 @@ Contributors are recognized in our community and may be featured in:
 - K-Dense community highlights
 
 Your contributions help make scientific computing more accessible and enable researchers to leverage AI tools more effectively!
+
+### Support Open Source
+
+This project builds on 50+ amazing open source projects. If you find value in these skills, please consider [supporting the projects we depend on](docs/open-source-sponsors.md).
 
 ---
 
