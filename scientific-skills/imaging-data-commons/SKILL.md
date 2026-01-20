@@ -1,38 +1,74 @@
 ---
 name: imaging-data-commons
-description: Access NCI Imaging Data Commons for cancer imaging (95TB+ DICOM). Query by cancer type/modality, download series, visualize in browser, check licenses via idc-index/BigQuery.
+description: Publicly available cancer imaging, image-derived data (annotations, features) in DICOM format, and various tools to explore, subset, visualize and access the data. Images available are contributed by large data collection initiatives, such as TCGA, CPTAC, CCDI, GETex, and individual investigators. Use when you want to find data to train new image analysis tools, explore hypotheses correlating imaging data with other data types, test existing tools. Query using rich metadata, download, visualize in browser, check licenses.
 license: Unknown
 metadata:
-    skill-author: K-Dense Inc.
+    skill-author: Andrey Fedorov, @fedorov
 ---
 
 # Imaging Data Commons
 
 ## Overview
 
-The National Cancer Institute Imaging Data Commons (IDC) is a cloud-based repository containing over 95TB of publicly available cancer imaging data in DICOM format. IDC aggregates radiology images (CT, MR, PET, etc.), digital pathology (whole slide microscopy), and image-derived data with accompanying clinical metadata from major cancer imaging collections including TCGA, NLST, QIN, and many others.
+Use the `idc-index` Python package to query and download public cancer imaging data from the NCI Imaging Data Commons (IDC). No authentication required for data access.
 
-This skill provides guidance for discovering, querying, downloading, and visualizing cancer imaging datasets from IDC using multiple access methods: the idc-index Python package for beginners, the IDC Portal for web-based exploration, BigQuery for advanced metadata queries, and SlicerIDCBrowser for 3D visualization.
+**Primary tool:** `idc-index` ([GitHub](https://github.com/imagingdatacommons/idc-index))
 
-All IDC data is stored in public cloud buckets (AWS and Google Cloud) with no authentication required for access, though some tools like BigQuery require a Google Cloud account with billing configured.
+**Check current data scale:**
+```python
+from idc_index import IDCClient
+client = IDCClient()
+# Get collection count and total series
+stats = client.sql_query("""
+    SELECT
+        COUNT(DISTINCT collection_id) as collections,
+        COUNT(DISTINCT PatientID) as patients,
+        COUNT(DISTINCT SeriesInstanceUID) as series
+    FROM index
+""")
+print(stats)
+```
+
+**Core workflow:**
+1. Query metadata → `client.sql_query()`
+2. Download DICOM files → `client.download_from_selection()`
+3. Visualize in browser → `client.get_viewer_URL(seriesInstanceUID=...)`
 
 ## When to Use This Skill
 
-This skill should be used when:
-- Working with publicly available cancer imaging datasets from NCI
-- Searching for DICOM medical images by cancer type, modality, or anatomical site
-- Downloading radiology (CT, MR, PET, etc.) or pathology (slide microscopy) images for research
-- Accessing large-scale imaging datasets with associated clinical metadata
-- Querying imaging data by patient demographics, study dates, scanner parameters, or collection
-- Understanding data licensing (CC-BY vs CC-NC) before use in research or commercial applications
-- Visualizing medical images without installing local DICOM viewer software
-- Building imaging analysis pipelines that require curated, standardized cancer imaging data
+- Finding publicly available radiology (CT, MR, PET) or pathology (slide microscopy) images
+- Selecting image subsets by cancer type, modality, anatomical site, or other metadata
+- Downloading DICOM data from IDC
+- Checking data licenses before use in research or commercial applications
+- Visualizing medical images in a browser without local DICOM viewer software
 
-**Not for:**
-- Private/institutional microscopy images (use omero-integration skill)
-- Gene expression or molecular data (use geo-database skill)
-- Protein structures (use pdb-database or alphafold-database skills)
-- General scientific literature searches (use pubmed-database skill)
+## IDC Data Model
+
+IDC adds two grouping levels above the standard DICOM hierarchy (Patient → Study → Series → Instance):
+
+- **collection_id**: Groups patients by disease, modality, or research focus (e.g., `tcga_luad`, `nlst`). A patient belongs to exactly one collection.
+- **analysis_result_id**: Identifies derived objects (segmentations, annotations, radiomics features) across one or more original collections.
+
+Use `collection_id` to find original imaging data, may include annotations deposited along with the images; use `analysis_result_id` to find AI-generated or expert annotations.
+
+**Key identifiers for queries:**
+| Identifier | Scope | Use for |
+|------------|-------|---------|
+| `collection_id` | Dataset grouping | Filtering by project/study |
+| `PatientID` | Patient | Grouping images by patient |
+| `SeriesInstanceUID` | Image series | Downloads and visualization |
+
+## Data Access Options
+
+| Method | Auth Required | Best For |
+|--------|---------------|----------|
+| `idc-index` | No | Most queries and downloads (recommended) |
+| IDC Portal | No | Interactive exploration, manual selection |
+| BigQuery | Yes (GCP account) | Complex queries, full DICOM metadata |
+| DICOMweb proxy | No | Tool integration via DICOMweb API |
+
+**DICOMweb endpoint (public, no auth):**
+`https://proxy.imaging.datacommons.cancer.gov/current/viewer-only-no-downloads-see-tinyurl-dot-com-slash-3j3d9jyp/dicomWeb`
 
 ## Installation and Setup
 
@@ -51,15 +87,6 @@ pip install google-cloud-bigquery db-dtypes
 ```bash
 pip install pandas numpy pydicom
 ```
-
-**Helper Scripts:**
-
-This skill includes Python helper scripts in the `scripts/` directory:
-- `idc_client.py` - Simplified client class for common query operations
-- `idc_download.py` - Download utilities with progress tracking
-- `idc_viewer.py` - Visualization URL generation and browser integration
-
-See the "Helper Scripts" section below for usage examples.
 
 ## Core Capabilities
 
@@ -188,37 +215,26 @@ client.download_from_selection(
 
 ### 4. Visualizing Medical Images
 
-Generate viewer URLs and visualize DICOM data without downloading:
+View DICOM data in browser without downloading:
 
-**Option 1: IDC Portal viewer (no installation required):**
 ```python
-# Construct viewer URL for any series
-series_uid = "1.3.6.1.4.1.14519.5.2.1.6279.6001.298806137288633453246975630178"
-viewer_url = f"https://viewer.imaging.datacommons.cancer.gov/viewer/{series_uid}"
-
-print(f"View in browser: {viewer_url}")
-# Open automatically in browser
+from idc_index import IDCClient
 import webbrowser
+
+client = IDCClient()
+
+# View single series
+viewer_url = client.get_viewer_URL(seriesInstanceUID="1.3.6.1.4.1...")
+webbrowser.open(viewer_url)
+
+# View all series in a study (useful for multi-series exams like MRI protocols)
+viewer_url = client.get_viewer_URL(studyInstanceUID="1.3.6.1.4.1...")
 webbrowser.open(viewer_url)
 ```
 
-**Option 2: Using helper script:**
-```python
-from scripts.idc_viewer import generate_viewer_url, open_in_browser
+The method automatically selects OHIF v3 for radiology or SLIM for slide microscopy. Viewing by study is useful when a DICOM Study contains multiple Series (e.g., T1, T2, DWI sequences from a single MRI session).
 
-# Generate URL for specific viewer type
-url = generate_viewer_url(series_uid, viewer_type='ohif')  # or 'volview', 'slim'
-
-# Open directly
-open_in_browser(url)
-```
-
-**Option 3: SlicerIDCBrowser extension:**
-
-For advanced 3D visualization and analysis:
-1. Install 3D Slicer (https://www.slicer.org/)
-2. Install SlicerIDCBrowser extension via Extension Manager
-3. Browse and download data directly within Slicer
+See `references/idc_portal_guide.md` for additional visualization options.
 
 ### 5. Understanding and Checking Licenses
 
@@ -294,61 +310,25 @@ for i in range(0, len(results), batch_size):
 
 ### 7. Advanced Queries with BigQuery
 
-Use BigQuery for complex metadata queries beyond the mini-index capabilities:
+For queries requiring full DICOM metadata, complex JOINs, or clinical data tables, use Google BigQuery. Requires GCP account with billing enabled.
 
-**When to use BigQuery:**
-- Need comprehensive metadata not in mini-index (frame-level data, detailed DICOM tags)
-- Complex JOIN operations across multiple tables
-- Querying segmentations, annotations, or image-derived features
-- Large-scale cohort selection with complex criteria
+**Quick reference:**
+- Dataset: `bigquery-public-data.idc_current.*`
+- Main table: `dicom_all` (combined metadata)
+- Full metadata: `dicom_metadata` (all DICOM tags)
 
-**Setup:**
-1. Create Google Cloud account and project
-2. Enable BigQuery API and configure billing
-3. Access IDC public datasets at `bigquery-public-data.idc_current.*`
-
-**Example BigQuery query:**
-```python
-from google.cloud import bigquery
-
-client = bigquery.Client()
-
-query = """
-SELECT
-  series.SeriesInstanceUID,
-  series.Modality,
-  series.BodyPartExamined,
-  COUNT(DISTINCT instance.SOPInstanceUID) as num_instances
-FROM `bigquery-public-data.idc_current.dicom_all` as instance
-JOIN `bigquery-public-data.idc_current.dicom_metadata` as series
-  ON instance.SeriesInstanceUID = series.SeriesInstanceUID
-WHERE series.Modality = 'MR'
-  AND series.collection_id = 'tcga_brca'
-GROUP BY series.SeriesInstanceUID, series.Modality, series.BodyPartExamined
-LIMIT 100
-"""
-
-results = client.query(query).to_dataframe()
-```
-
-See `references/bigquery_guide.md` for comprehensive BigQuery documentation.
+See `references/bigquery_guide.md` for setup, table schemas, query patterns, and cost optimization.
 
 ### 8. Tool Selection Guide
 
-Choose the right IDC tool based on your task:
+| Task | Tool | Reference |
+|------|------|-----------|
+| Programmatic queries & downloads | `idc-index` | This document |
+| Interactive exploration | IDC Portal | `references/idc_portal_guide.md` |
+| Complex metadata queries | BigQuery | `references/bigquery_guide.md` |
+| 3D visualization & analysis | SlicerIDCBrowser | `references/idc_portal_guide.md` |
 
-| Tool | Best For | Pros | Cons |
-|------|----------|------|------|
-| **idc-index** | Beginners, simple queries, batch downloads | No auth required, easy Python API, free | Limited metadata fields |
-| **IDC Portal** | Quick exploration, visualization, manual selection | Web-based, no install, interactive viewers | Manual process, not scriptable |
-| **BigQuery** | Complex queries, comprehensive metadata, large cohorts | Full DICOM metadata, powerful SQL | Requires GCP account and billing |
-| **SlicerIDCBrowser** | 3D visualization, segmentation, advanced analysis | Full Slicer capabilities, integrated workflow | Requires Slicer installation |
-
-**Recommended workflow:**
-1. Start with **IDC Portal** to explore collections and understand data structure
-2. Use **idc-index** for programmatic queries and downloads
-3. Graduate to **BigQuery** only when you need comprehensive metadata or complex queries
-4. Use **SlicerIDCBrowser** for advanced visualization and analysis workflows
+**Default choice:** Use `idc-index` for most tasks (no auth, easy API, batch downloads).
 
 ### 9. Integration with Analysis Pipelines
 
@@ -510,38 +490,28 @@ for _, row in manufacturers.head(3).iterrows():
 
 **Objective:** Preview imaging data before committing to download
 
-**Steps:**
 ```python
 from idc_index import IDCClient
 import webbrowser
 
 client = IDCClient()
 
-# Find interesting cases
-query = """
-SELECT
-  SeriesInstanceUID,
-  PatientID,
-  SeriesDescription
-FROM index
-WHERE collection_id = 'qin-headneck'
-  AND Modality = 'PT'
-LIMIT 10
-"""
-
-series_list = client.sql_query(query)
+series_list = client.sql_query("""
+    SELECT SeriesInstanceUID, PatientID, SeriesDescription
+    FROM index
+    WHERE collection_id = 'qin-headneck' AND Modality = 'PT'
+    LIMIT 10
+""")
 
 # Preview each in browser
-for idx, row in series_list.iterrows():
-    series_uid = row['SeriesInstanceUID']
-    viewer_url = f"https://viewer.imaging.datacommons.cancer.gov/viewer/{series_uid}"
-
+for _, row in series_list.iterrows():
+    viewer_url = client.get_viewer_URL(seriesInstanceUID=row['SeriesInstanceUID'])
     print(f"Patient {row['PatientID']}: {row['SeriesDescription']}")
     print(f"  View at: {viewer_url}")
-
-    # Optional: open in browser
-    # webbrowser.open(viewer_url)
+    # webbrowser.open(viewer_url)  # Uncomment to open automatically
 ```
+
+See `references/idc_portal_guide.md` for additional visualization options.
 
 ### Use Case 4: License-Aware Batch Download for Commercial Use
 
@@ -612,11 +582,7 @@ cc_by_data.to_csv('commercial_dataset_manifest_CC-BY_ONLY.csv', index=False)
 
 **Issue: `BigQuery quota exceeded` or billing errors**
 - **Cause:** BigQuery requires billing-enabled GCP project
-- **Solution:**
-  - Use idc-index mini-index for simple queries (no billing required)
-  - Enable billing in Google Cloud Console
-  - Check query cost before running (`client.query(query).total_bytes_processed`)
-  - Consider query optimization
+- **Solution:** Use idc-index mini-index for simple queries (no billing required), or see `references/bigquery_guide.md` for cost optimization tips
 
 **Issue: Series UID not found or no data returned**
 - **Cause:** Typo in UID, data not in current IDC version, or wrong field name
@@ -634,68 +600,64 @@ cc_by_data.to_csv('commercial_dataset_manifest_CC-BY_ONLY.csv', index=False)
   - Try different DICOM viewer (3D Slicer, Horos, RadiAnt)
   - Re-download the series
 
-## Helper Scripts
+## Common SQL Query Patterns
 
-This skill provides Python helper scripts for common operations. Scripts are located in `scripts/` directory.
+Use `client.sql_query()` with these patterns for common search tasks:
 
-### scripts/idc_client.py - Simplified Client Class
-
-Wrapper around idc-index with convenience methods:
-
+### Search by cancer type
 ```python
-from scripts.idc_client import IDCClient
-
-client = IDCClient()
-
-# Search by cancer type
-breast_mr = client.search_by_cancer_type('Breast', modality='MR')
-
-# Search by modality
-all_pet = client.search_by_modality('PT', body_part='CHEST')
-
-# Get collections summary
-summary = client.get_collections_summary()
-
-# Check licenses
-licenses = client.check_licenses(collection_id='tcga_luad')
+client.sql_query("""
+    SELECT collection_id, PatientID, SeriesInstanceUID, Modality, SeriesDescription
+    FROM index
+    WHERE cancer_type = 'Breast' AND Modality = 'MR'
+    LIMIT 100
+""")
 ```
 
-### scripts/idc_download.py - Download Utilities
-
-Advanced download functions with progress tracking:
-
+### Search by modality and body part
 ```python
-from scripts.idc_download import download_collection, get_download_size_estimate
-
-# Estimate size before downloading
-size_gb = get_download_size_estimate(collection_id='rider_pilot')
-print(f"Estimated download size: {size_gb:.2f} GB")
-
-# Download with custom options
-download_collection(
-    collection_id='rider_pilot',
-    output_dir='./data',
-    dir_template='%PatientID/%Modality'
-)
+client.sql_query("""
+    SELECT collection_id, PatientID, SeriesInstanceUID, BodyPartExamined
+    FROM index
+    WHERE Modality = 'CT' AND BodyPartExamined LIKE '%LUNG%'
+    LIMIT 100
+""")
 ```
 
-### scripts/idc_viewer.py - Visualization Helpers
-
-Generate viewer URLs and launch browsers:
-
+### Get collections summary
 ```python
-from scripts.idc_viewer import generate_viewer_url, open_in_browser
+client.sql_query("""
+    SELECT collection_id,
+           COUNT(DISTINCT PatientID) as num_patients,
+           COUNT(DISTINCT SeriesInstanceUID) as num_series,
+           license_short_name
+    FROM index
+    GROUP BY collection_id, license_short_name
+    ORDER BY num_patients DESC
+""")
+```
 
-# Generate URL for specific viewer
-url = generate_viewer_url(series_uid, viewer_type='ohif')
+### Check licenses for a collection
+```python
+client.sql_query("""
+    SELECT DISTINCT collection_id, license_short_name, license_url
+    FROM index
+    WHERE collection_id = 'tcga_luad'
+""")
+```
 
-# Open in default browser
-open_in_browser(url)
+### Estimate download size
+```python
+# Use get_series_size() for individual series
+size_mb = client.get_series_size(seriesInstanceUID="1.3.6.1.4.1...")
 
-# Validate Series UID format
-from scripts.idc_viewer import validate_series_uid
-if validate_series_uid(series_uid):
-    print("Valid UID format")
+# Or query for aggregate size across series
+client.sql_query("""
+    SELECT collection_id, SUM(series_size_MB) as total_mb
+    FROM index
+    WHERE collection_id = 'rider_pilot'
+    GROUP BY collection_id
+""")
 ```
 
 ## Resources
@@ -704,6 +666,7 @@ if validate_series_uid(series_uid):
 
 - **idc_index_api.md** - Complete idc-index Python API reference with all methods and parameters
 - **bigquery_guide.md** - Advanced BigQuery usage guide for complex metadata queries
+- **idc_portal_guide.md** - IDC Portal, visualization options, and SlicerIDCBrowser
 - **metadata_schema.md** - IDC data hierarchy and metadata field documentation
 
 ### External Links

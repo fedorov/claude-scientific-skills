@@ -123,6 +123,49 @@ client.download_from_manifest(
 )
 ```
 
+### get_viewer_URL()
+
+Get viewer URL for a series. Automatically selects appropriate viewer (OHIF for radiology, SLIM for pathology).
+
+```python
+# Auto-select viewer based on modality
+url = client.get_viewer_URL(seriesInstanceUID="1.3.6.1.4.1...")
+
+# Force specific viewer
+url = client.get_viewer_URL(
+    seriesInstanceUID="1.3.6.1.4.1...",
+    viewer_selector='slim'  # 'ohif_v2', 'ohif_v3', or 'slim'
+)
+
+# View by study
+url = client.get_viewer_URL(studyInstanceUID="1.3.6.1.4.1...")
+```
+
+**Parameters:**
+- `seriesInstanceUID` (str): Series to view (StudyInstanceUID auto-resolved from index)
+- `studyInstanceUID` (str): Alternative - view entire study
+- `viewer_selector` (str, optional): Force viewer type ('ohif_v2', 'ohif_v3', 'slim')
+
+**Returns:** Viewer URL string
+
+### get_idc_version() (static)
+
+Get the current IDC data version.
+
+```python
+version = IDCClient.get_idc_version()
+print(f"IDC version: {version}")
+```
+
+### get_series_size()
+
+Get cumulative size of DICOM instances in a series (in MB).
+
+```python
+size_mb = client.get_series_size(seriesInstanceUID="1.3.6.1.4.1...")
+print(f"Series size: {size_mb:.2f} MB")
+```
+
 ## Command Line Interface
 
 idc-index also provides a CLI:
@@ -251,13 +294,3 @@ downloadDir/
 **Issue: Empty results from query**
 - Cause: No data matches filters, or incorrect field values
 - Solution: Broaden query criteria, check valid values for fields (e.g., Modality = 'CT' not 'ct')
-
-## Helper Scripts
-
-The IDC skill provides helper scripts that wrap idc-index with convenience methods:
-
-- **`scripts/idc_client.py`** - Simplified client with methods like `search_by_cancer_type()`, `search_by_modality()`
-- **`scripts/idc_download.py`** - Download utilities with size estimation and batch processing
-- **`scripts/idc_viewer.py`** - Visualization helpers for generating viewer URLs
-
-See main SKILL.md for usage examples of helper scripts.
