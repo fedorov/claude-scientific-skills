@@ -87,7 +87,7 @@ The `idc-index` package provides multiple metadata index tables, accessible via 
 | `sm_instance_index` | 1 row = 1 slide microscopy instance | fetch_index() | Instance-level (SOPInstanceUID) metadata for slide microscopy |
 
 **Auto** = loaded automatically when `IDCClient()` is instantiated
-**fetch_index()** = bundled but requires `client.fetch_index("table_name")` to load
+**fetch_index()** = requires `client.fetch_index("table_name")` to load
 
 ### Joining Tables
 
@@ -214,8 +214,7 @@ Most common columns for queries (use `indices_overview` for complete list and de
 | `StudyDate` | STRING | Yes | Date study was performed |
 | `PatientSex` | STRING | Yes | Patient sex |
 | `PatientAge` | STRING | Yes | Patient age at time of study |
-| `cancer_type` | STRING | No | IDC-curated cancer type classification |
-| `license_short_name` | STRING | No | License type (CC-BY, CC-NC, etc.) |
+| `license_short_name` | STRING | No | License type (CC BY 4.0, CC BY-NC 4.0, etc.) |
 | `series_size_MB` | FLOAT | No | Size of series in megabytes |
 | `instanceCount` | INTEGER | No | Number of DICOM instances in series |
 
@@ -276,69 +275,112 @@ from idc_index import IDCClient
 
 client = IDCClient()
 
-# Get summary of all collections
+# Get summary statistics from primary index
 query = """
 SELECT
   collection_id,
   COUNT(DISTINCT PatientID) as patients,
   COUNT(DISTINCT SeriesInstanceUID) as series,
-  COUNT(*) as instances
+  SUM(series_size_MB) as size_mb
 FROM index
 GROUP BY collection_id
 ORDER BY patients DESC
 """
-
 collections_summary = client.sql_query(query)
-print(collections_summary)
+
+# For richer collection metadata, use collections_index
+client.fetch_index("collections_index")
+collections_info = client.sql_query("""
+    SELECT collection_id, CancerTypes, TumorLocations, Species, Subjects, SupportingData
+    FROM collections_index
+""")
+
+# For analysis results (annotations, segmentations), use analysis_results_index
+client.fetch_index("analysis_results_index")
+analysis_info = client.sql_query("""
+    SELECT analysis_result_id, analysis_result_title, Subjects, Collections, Modalities
+    FROM analysis_results_index
+""")
 ```
 
-**Example output:**
-```
-       collection_id  patients  series  instances
-0     tcga_luad        515      2847     523891
-1     nlst             2452     5104     1832419
-...
-```
+**`collections_index`** provides curated metadata per collection: cancer types, tumor locations, species, subject counts, and supporting data types — without needing to aggregate from the primary index.
+
+**`analysis_results_index`** lists derived datasets (AI segmentations, expert annotations, radiomics features) with their source collections and modalities.
 
 ### 2. Querying Metadata with SQL
 
-Query the IDC mini-index using SQL to find specific datasets:
+Query the IDC mini-index using SQL to find specific datasets.
 
+**First, explore available values for filter columns:**
 ```python
 from idc_index import IDCClient
 
 client = IDCClient()
 
-# Find breast cancer MRI scans
-query = """
-SELECT
-  collection_id,
-  PatientID,
-  SeriesInstanceUID,
-  Modality,
-  SeriesDescription,
-  license_short_name
-FROM index
-WHERE cancer_type = 'Breast'
-  AND Modality = 'MR'
-  AND BodyPartExamined LIKE '%BREAST%'
-LIMIT 20
-"""
+# Check what Modality values exist
+modalities = client.sql_query("""
+    SELECT DISTINCT Modality, COUNT(*) as series_count
+    FROM index
+    GROUP BY Modality
+    ORDER BY series_count DESC
+""")
+print(modalities)
 
-results = client.sql_query(query)
+# Check what BodyPartExamined values exist for MR modality
+body_parts = client.sql_query("""
+    SELECT DISTINCT BodyPartExamined, COUNT(*) as series_count
+    FROM index
+    WHERE Modality = 'MR' AND BodyPartExamined IS NOT NULL
+    GROUP BY BodyPartExamined
+    ORDER BY series_count DESC
+    LIMIT 20
+""")
+print(body_parts)
+```
+
+**Then query with validated filter values:**
+```python
+# Find breast MRI scans (use actual values from exploration above)
+results = client.sql_query("""
+    SELECT
+      collection_id,
+      PatientID,
+      SeriesInstanceUID,
+      Modality,
+      SeriesDescription,
+      license_short_name
+    FROM index
+    WHERE Modality = 'MR'
+      AND BodyPartExamined = 'BREAST'
+    LIMIT 20
+""")
 
 # Access results as pandas DataFrame
 for idx, row in results.iterrows():
     print(f"Patient: {row['PatientID']}, Series: {row['SeriesInstanceUID']}")
 ```
 
-**Available metadata fields:**
-- Identifiers: collection_id, PatientID, StudyInstanceUID, SeriesInstanceUID, SOPInstanceUID
+**To filter by cancer type, join with `collections_index`:**
+```python
+client.fetch_index("collections_index")
+results = client.sql_query("""
+    SELECT i.collection_id, i.PatientID, i.SeriesInstanceUID, i.Modality
+    FROM index i
+    JOIN collections_index c ON i.collection_id = c.collection_id
+    WHERE c.CancerTypes LIKE '%Breast%'
+      AND i.Modality = 'MR'
+    LIMIT 20
+""")
+```
+
+**Available metadata fields** (use `client.indices_overview` for complete list):
+- Identifiers: collection_id, PatientID, StudyInstanceUID, SeriesInstanceUID
 - Imaging: Modality, BodyPartExamined, Manufacturer, ManufacturerModelName
-- Clinical: PatientAge, PatientSex, StudyDate, SeriesDate
+- Clinical: PatientAge, PatientSex, StudyDate
 - Descriptions: StudyDescription, SeriesDescription
-- Licensing: license_short_name, license_long_name, license_url
-- Curated: cancer_type (manually annotated field)
+- Licensing: license_short_name
+
+**Note:** Cancer type is in `collections_index.CancerTypes`, not in the primary `index` table.
 
 ### 3. Downloading DICOM Files
 
@@ -360,16 +402,14 @@ client.download_from_selection(
 **Download specific series:**
 ```python
 # First, query for series UIDs
-query = """
-SELECT SeriesInstanceUID
-FROM index
-WHERE Modality = 'CT'
-  AND BodyPartExamined = 'LUNG'
-  AND collection_id = 'nlst'
-LIMIT 5
-"""
-
-series_df = client.sql_query(query)
+series_df = client.sql_query("""
+    SELECT SeriesInstanceUID
+    FROM index
+    WHERE Modality = 'CT'
+      AND BodyPartExamined = 'CHEST'
+      AND collection_id = 'nlst'
+    LIMIT 5
+""")
 
 # Download only those series
 client.download_from_selection(
@@ -379,18 +419,28 @@ client.download_from_selection(
 ```
 
 **Custom directory structure:**
+
+Default `dirTemplate`: `%collection_id/%PatientID/%StudyInstanceUID/%Modality_%SeriesInstanceUID`
+
 ```python
-# Organize downloads by patient and modality
+# Simplified hierarchy (omit StudyInstanceUID level)
 client.download_from_selection(
     collection_id="tcga_luad",
-    downloadDir="./data/tcga",
-    dirTemplate="%collection_id/%PatientID/%Modality_%SeriesInstanceUID"
+    downloadDir="./data",
+    dirTemplate="%collection_id/%PatientID/%Modality"
 )
+# Results in: ./data/tcga_luad/TCGA-05-4244/CT/
 
-# Results in: ./data/tcga/tcga_luad/TCGA-05-4244/CT_1.2.840.../
+# Flat structure (all files in one directory)
+client.download_from_selection(
+    seriesInstanceUID=list(series_df['SeriesInstanceUID'].values),
+    downloadDir="./data/flat",
+    dirTemplate=""
+)
+# Results in: ./data/flat/*.dcm
 ```
 
-### 4. Visualizing Medical Images
+### 4. Visualizing IDC Images
 
 View DICOM data in browser without downloading:
 
@@ -400,12 +450,20 @@ import webbrowser
 
 client = IDCClient()
 
+# First query to get valid UIDs
+results = client.sql_query("""
+    SELECT SeriesInstanceUID, StudyInstanceUID
+    FROM index
+    WHERE collection_id = 'rider_pilot' AND Modality = 'CT'
+    LIMIT 1
+""")
+
 # View single series
-viewer_url = client.get_viewer_URL(seriesInstanceUID="1.3.6.1.4.1...")
+viewer_url = client.get_viewer_URL(seriesInstanceUID=results.iloc[0]['SeriesInstanceUID'])
 webbrowser.open(viewer_url)
 
 # View all series in a study (useful for multi-series exams like MRI protocols)
-viewer_url = client.get_viewer_URL(studyInstanceUID="1.3.6.1.4.1...")
+viewer_url = client.get_viewer_URL(studyInstanceUID=results.iloc[0]['StudyInstanceUID'])
 webbrowser.open(viewer_url)
 ```
 
@@ -427,11 +485,9 @@ query = """
 SELECT DISTINCT
   collection_id,
   license_short_name,
-  license_long_name,
-  license_url,
   COUNT(DISTINCT SeriesInstanceUID) as series_count
 FROM index
-GROUP BY collection_id, license_short_name, license_long_name, license_url
+GROUP BY collection_id, license_short_name
 ORDER BY collection_id
 """
 
@@ -440,8 +496,9 @@ print(licenses)
 ```
 
 **License types in IDC:**
-- **CC-BY-4.0** (>95% of data) - Allows commercial use with attribution
-- **CC-BY-NC-4.0** - Non-commercial use only, requires attribution
+- **CC BY 4.0** / **CC BY 3.0** (~97% of data) - Allows commercial use with attribution
+- **CC BY-NC 4.0** / **CC BY-NC 3.0** (~3% of data) - Non-commercial use only
+- **Custom licenses** (rare) - Some collections have specific terms (e.g., NLM Terms and Conditions)
 
 **Important:** Always check the license before using IDC data in publications or commercial applications. Each DICOM file is tagged with its specific license in metadata.
 
@@ -455,7 +512,7 @@ import pandas as pd
 
 client = IDCClient()
 
-# Find all lung CT scans from GE scanners
+# Find chest CT scans from GE scanners
 query = """
 SELECT
   SeriesInstanceUID,
@@ -464,9 +521,9 @@ SELECT
   ManufacturerModelName
 FROM index
 WHERE Modality = 'CT'
-  AND BodyPartExamined = 'LUNG'
+  AND BodyPartExamined = 'CHEST'
   AND Manufacturer = 'GE MEDICAL SYSTEMS'
-  AND license_short_name = 'CC-BY'
+  AND license_short_name = 'CC BY 4.0'
 LIMIT 100
 """
 
@@ -593,7 +650,7 @@ FROM index
 WHERE collection_id = 'nlst'
   AND Modality = 'CT'
   AND BodyPartExamined = 'CHEST'
-  AND license_short_name = 'CC-BY'
+  AND license_short_name = 'CC BY 4.0'
 ORDER BY PatientID
 LIMIT 100
 """
@@ -676,7 +733,7 @@ client = IDCClient()
 series_list = client.sql_query("""
     SELECT SeriesInstanceUID, PatientID, SeriesDescription
     FROM index
-    WHERE collection_id = 'qin-headneck' AND Modality = 'PT'
+    WHERE collection_id = 'acrin_nsclc_fdg_pet' AND Modality = 'PT'
     LIMIT 10
 """)
 
@@ -700,7 +757,7 @@ from idc_index import IDCClient
 
 client = IDCClient()
 
-# Query ONLY for CC-BY licensed data
+# Query ONLY for CC BY licensed data (allows commercial use with attribution)
 query = """
 SELECT
   SeriesInstanceUID,
@@ -708,7 +765,8 @@ SELECT
   PatientID,
   Modality
 FROM index
-WHERE license_short_name = 'CC-BY'
+WHERE license_short_name LIKE 'CC BY%'
+  AND license_short_name NOT LIKE '%NC%'
   AND Modality IN ('CT', 'MR')
   AND BodyPartExamined IN ('CHEST', 'BRAIN', 'ABDOMEN')
 LIMIT 200
@@ -716,7 +774,7 @@ LIMIT 200
 
 cc_by_data = client.sql_query(query)
 
-print(f"Found {len(cc_by_data)} CC-BY licensed series")
+print(f"Found {len(cc_by_data)} CC BY licensed series")
 print(f"Collections: {cc_by_data['collection_id'].unique()}")
 
 # Download with license verification
@@ -732,7 +790,7 @@ cc_by_data.to_csv('commercial_dataset_manifest_CC-BY_ONLY.csv', index=False)
 
 ## Best Practices
 
-- **Check licenses before use** - Always query the `license_short_name` field and respect licensing terms (CC-BY vs CC-NC)
+- **Check licenses before use** - Always query the `license_short_name` field and respect licensing terms (CC BY vs CC BY-NC)
 - **Start with small queries** - Use `LIMIT` clause when exploring to avoid long downloads and understand data structure
 - **Use mini-index for simple queries** - Only use BigQuery when you need comprehensive metadata or complex JOINs
 - **Validate Series UIDs** - DICOM UIDs follow format `1.2.840.xxxxx...` - validate before attempting downloads
@@ -781,12 +839,14 @@ cc_by_data.to_csv('commercial_dataset_manifest_CC-BY_ONLY.csv', index=False)
 
 Use `client.sql_query()` with these patterns for common search tasks:
 
-### Search by cancer type
+### Search by cancer type (requires join with collections_index)
 ```python
+client.fetch_index("collections_index")
 client.sql_query("""
-    SELECT collection_id, PatientID, SeriesInstanceUID, Modality, SeriesDescription
-    FROM index
-    WHERE cancer_type = 'Breast' AND Modality = 'MR'
+    SELECT i.collection_id, i.PatientID, i.SeriesInstanceUID, i.Modality, i.SeriesDescription
+    FROM index i
+    JOIN collections_index c ON i.collection_id = c.collection_id
+    WHERE c.CancerTypes LIKE '%Breast%' AND i.Modality = 'MR'
     LIMIT 100
 """)
 ```
@@ -825,16 +885,17 @@ client.sql_query("""
 
 ### Estimate download size
 ```python
-# Use get_series_size() for individual series
-size_mb = client.get_series_size(seriesInstanceUID="1.3.6.1.4.1...")
-
-# Or query for aggregate size across series
+# Query for aggregate size across series (recommended)
 client.sql_query("""
     SELECT collection_id, SUM(series_size_MB) as total_mb
     FROM index
     WHERE collection_id = 'rider_pilot'
     GROUP BY collection_id
 """)
+
+# Or use get_series_size() for individual series from query results
+series = client.sql_query("SELECT SeriesInstanceUID FROM index WHERE collection_id = 'rider_pilot' LIMIT 1")
+size_mb = client.get_series_size(seriesInstanceUID=series.iloc[0]['SeriesInstanceUID'])
 ```
 
 ## Resources
