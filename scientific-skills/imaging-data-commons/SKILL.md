@@ -203,7 +203,7 @@ Most common columns for queries (use `indices_overview` for complete list and de
 |--------|------|-------|-------------|
 | `collection_id` | STRING | No | IDC collection identifier |
 | `analysis_result_id` | STRING | No | If applicable, indicates what analysis results collection given series is part of |
-| `source_DOI` | STRING | Digital Object Identifier for the resource describing the source of the data |
+| `source_DOI` | STRING | No | DOI linking to dataset documentation; use for learning more about the content and for attribution (see citations below) |
 | `PatientID` | STRING | Yes | Patient identifier |
 | `StudyInstanceUID` | STRING | Yes | DICOM Study UID |
 | `SeriesInstanceUID` | STRING | Yes | DICOM Series UID — use for downloads/viewing |
@@ -502,6 +502,49 @@ print(licenses)
 
 **Important:** Always check the license before using IDC data in publications or commercial applications. Each DICOM file is tagged with its specific license in metadata.
 
+### Generating Citations for Attribution
+
+The `source_DOI` column contains DOIs linking to publications describing how the data was generated. To satisfy attribution requirements, use `citations_from_selection()` to generate properly formatted citations:
+
+```python
+from idc_index import IDCClient
+
+client = IDCClient()
+
+# Get citations for a collection (APA format by default)
+citations = client.citations_from_selection(collection_id="rider_pilot")
+for citation in citations:
+    print(citation)
+
+# Get citations for specific series
+results = client.sql_query("""
+    SELECT SeriesInstanceUID FROM index
+    WHERE collection_id = 'tcga_luad' LIMIT 5
+""")
+citations = client.citations_from_selection(
+    seriesInstanceUID=list(results['SeriesInstanceUID'].values)
+)
+
+# Alternative format: BibTeX (for LaTeX documents)
+bibtex_citations = client.citations_from_selection(
+    collection_id="tcga_luad",
+    citation_format=IDCClient.CITATION_FORMAT_BIBTEX
+)
+```
+
+**Parameters:**
+- `collection_id`: Filter by collection(s)
+- `patientId`: Filter by patient ID(s)
+- `studyInstanceUID`: Filter by study UID(s)
+- `seriesInstanceUID`: Filter by series UID(s)
+- `citation_format`: Use `IDCClient.CITATION_FORMAT_*` constants:
+  - `CITATION_FORMAT_APA` (default) - APA style
+  - `CITATION_FORMAT_BIBTEX` - BibTeX for LaTeX
+  - `CITATION_FORMAT_JSON` - CSL JSON
+  - `CITATION_FORMAT_TURTLE` - RDF Turtle
+
+**Best practice:** When publishing results using IDC data, include the generated citations to properly attribute the data sources and satisfy license requirements.
+
 ### 6. Batch Processing and Filtering
 
 Process large datasets efficiently with filtering:
@@ -791,6 +834,7 @@ cc_by_data.to_csv('commercial_dataset_manifest_CC-BY_ONLY.csv', index=False)
 ## Best Practices
 
 - **Check licenses before use** - Always query the `license_short_name` field and respect licensing terms (CC BY vs CC BY-NC)
+- **Generate citations for attribution** - Use `citations_from_selection()` to get properly formatted citations from `source_DOI` values; include these in publications
 - **Start with small queries** - Use `LIMIT` clause when exploring to avoid long downloads and understand data structure
 - **Use mini-index for simple queries** - Only use BigQuery when you need comprehensive metadata or complex JOINs
 - **Validate Series UIDs** - DICOM UIDs follow format `1.2.840.xxxxx...` - validate before attempting downloads
