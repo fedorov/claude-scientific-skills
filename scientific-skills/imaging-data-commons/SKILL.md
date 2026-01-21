@@ -203,7 +203,7 @@ Most common columns for queries (use `indices_overview` for complete list and de
 |--------|------|-------|-------------|
 | `collection_id` | STRING | No | IDC collection identifier |
 | `analysis_result_id` | STRING | No | If applicable, indicates what analysis results collection given series is part of |
-| `source_DOI` | STRING | No | DOI linking to dataset documentation; use for learning more about the content and for attribution (see citations below) |
+| `source_DOI` | STRING | No | DOI linking to dataset details; use for learning more about the content and for attribution (see citations below) |
 | `PatientID` | STRING | Yes | Patient identifier |
 | `StudyInstanceUID` | STRING | Yes | DICOM Study UID |
 | `SeriesInstanceUID` | STRING | Yes | DICOM Series UID — use for downloads/viewing |
@@ -242,15 +242,16 @@ clinical_df = client.get_clinical_table("table_name")
 | BigQuery | Yes (GCP account) | Complex queries, full DICOM metadata |
 | DICOMweb proxy | No | Tool integration via DICOMweb API |
 
-**DICOMweb endpoints**
+**DICOMweb access**
 
-Public, proxied, no auth, daily quota applies, points to the latesrt version ("no-downloads" in the URL is legacy and has no meaning):
+IDC data is available via DICOMweb interface (Google Cloud Healthcare API implementation) for integration with PACS systems and DICOMweb-compatible tools.
 
-`https://proxy.imaging.datacommons.cancer.gov/current/viewer-only-no-downloads-see-tinyurl-dot-com-slash-3j3d9jyp/dicomWeb`
+| Endpoint | Auth | Use Case |
+|----------|------|----------|
+| Public proxy | No | Testing, moderate queries, daily quota |
+| Google Healthcare | Yes (GCP) | Production use, higher quotas |
 
-Direct Google Healthcare DICOM store, versioned, reqires google auth (DICOM store naming convention: `idc-store-v{IDC data release}`):
-
-`https://healthcare.googleapis.com/v1/projects/nci-idc-data/locations/us-central1/datasets/idc/dicomStores/idc-store-v23/dicomWeb`
+See `references/dicomweb_guide.md` for endpoint URLs, code examples, supported operations, and implementation details.
 
 ## Installation and Setup
 
@@ -958,6 +959,7 @@ columns = [(c['name'], c['type'], c.get('description', '')) for c in schema['col
 
 - **idc_index_api.md** - Complete idc-index Python API reference with all methods and parameters
 - **bigquery_guide.md** - Advanced BigQuery usage guide for complex metadata queries
+- **dicomweb_guide.md** - DICOMweb endpoint URLs, code examples, and Google Healthcare API implementation details
 - **idc_portal_guide.md** - IDC Portal, visualization options, and SlicerIDCBrowser
 - **metadata_schema.md** - IDC data hierarchy and metadata field documentation
 - **[indices_reference](https://idc-index.readthedocs.io/en/latest/indices_reference.html)** - External documentation for index tables (may lag behind installed version)
