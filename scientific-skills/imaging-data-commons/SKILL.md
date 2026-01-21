@@ -441,6 +441,72 @@ client.download_from_selection(
 # Results in: ./data/flat/*.dcm
 ```
 
+### Command-Line Download
+
+The `idc download` command provides command-line access to download functionality without writing Python code. Available after installing `idc-index`.
+
+**Auto-detects input type:** manifest file path, or identifiers (collection_id, PatientID, StudyInstanceUID, SeriesInstanceUID, crdc_series_uuid).
+
+```bash
+# Download entire collection
+idc download rider_pilot --download-dir ./data
+
+# Download specific series by UID
+idc download "1.3.6.1.4.1.9328.50.1.69736" --download-dir ./data
+
+# Download multiple items (comma-separated)
+idc download "tcga_luad,tcga_lusc" --download-dir ./data
+
+# Download from manifest file (auto-detected)
+idc download manifest.txt --download-dir ./data
+```
+
+**Options:**
+
+| Option | Description |
+|--------|-------------|
+| `--download-dir` | Output directory (default: current directory) |
+| `--dir-template` | Directory hierarchy template (default: `%collection_id/%PatientID/%StudyInstanceUID/%Modality_%SeriesInstanceUID`) |
+| `--log-level` | Verbosity: debug, info, warning, error, critical |
+
+**Manifest files:**
+
+Manifest files contain S3 URLs (one per line) and can be:
+- Exported from the IDC Portal after cohort selection
+- Shared by collaborators for reproducible data access
+- Generated programmatically from query results
+
+Format (one S3 URL per line):
+```
+s3://idc-open-data/cb09464a-c5cc-4428-9339-d7fa87cfe837/*
+s3://idc-open-data/88f3990d-bdef-49cd-9b2b-4787767240f2/*
+```
+
+**Example: Generate manifest from Python query:**
+
+```python
+from idc_index import IDCClient
+
+client = IDCClient()
+
+# Query for series URLs
+results = client.sql_query("""
+    SELECT series_aws_url
+    FROM index
+    WHERE collection_id = 'rider_pilot' AND Modality = 'CT'
+""")
+
+# Save as manifest file
+with open('ct_manifest.txt', 'w') as f:
+    for url in results['series_aws_url']:
+        f.write(url + '\n')
+```
+
+Then download:
+```bash
+idc download ct_manifest.txt --download-dir ./ct_data
+```
+
 ### 4. Visualizing IDC Images
 
 View DICOM data in browser without downloading:
@@ -838,11 +904,9 @@ cc_by_data.to_csv('commercial_dataset_manifest_CC-BY_ONLY.csv', index=False)
 - **Generate citations for attribution** - Use `citations_from_selection()` to get properly formatted citations from `source_DOI` values; include these in publications
 - **Start with small queries** - Use `LIMIT` clause when exploring to avoid long downloads and understand data structure
 - **Use mini-index for simple queries** - Only use BigQuery when you need comprehensive metadata or complex JOINs
-- **Validate Series UIDs** - DICOM UIDs follow format `1.2.840.xxxxx...` - validate before attempting downloads
 - **Organize downloads with dirTemplate** - Use meaningful directory structures like `%collection_id/%PatientID/%Modality`
 - **Cache query results** - Save DataFrames to CSV files to avoid re-querying and ensure reproducibility
-- **Handle network errors** - Implement retry logic for large downloads that may timeout
-- **Estimate size first** - Check collection size before downloading - some collections are 100s of GBs
+- **Estimate size first** - Check collection size before downloading - some collection sizes are in terabytes!
 - **Save manifests** - Always save query results with Series UIDs for reproducibility and data provenance
 - **Read documentation** - IDC data structure and metadata fields are documented at https://learn.canceridc.dev/
 
@@ -867,7 +931,6 @@ cc_by_data.to_csv('commercial_dataset_manifest_CC-BY_ONLY.csv', index=False)
 **Issue: Series UID not found or no data returned**
 - **Cause:** Typo in UID, data not in current IDC version, or wrong field name
 - **Solution:**
-  - Verify UID format: should start with `1.2.840.` or similar
   - Check if data is in current IDC version (some old data may be deprecated)
   - Use `LIMIT 5` to test query first
   - Check field names against metadata schema documentation
