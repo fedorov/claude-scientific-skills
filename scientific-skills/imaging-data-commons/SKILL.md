@@ -1,6 +1,6 @@
 ---
 name: imaging-data-commons
-description: Publicly available cancer imaging, image-derived data (annotations, features) in DICOM format, and various tools to explore, subset, visualize and access the data. Images available are contributed by large data collection initiatives, such as TCGA, CPTAC, CCDI, GETex, and individual investigators. Use when you want to find data to train new image analysis tools, explore hypotheses correlating imaging data with other data types, test existing tools. Query using rich metadata, download, visualize in browser, check licenses.
+description: Publicly available cancer imaging, image-derived data (annotations, features) in DICOM format, and various tools to explore, subset, visualize and access the data. Images available are contributed by large data collection initiatives, such as TCGA, CPTAC, CCDI, GETex, and individual investigators. Use when you want to find data to train new image analysis tools, explore hypotheses correlating imaging data with other data types, test existing tools. Query using rich metadata, download, visualize in browser, check licenses. For processing downloaded DICOM files use pydicom; for pathology slide analysis use histolab or pathml; for metadata visualization use matplotlib, seaborn, or plotly.
 license: Unknown
 metadata:
     skill-author: Andrey Fedorov, @fedorov
@@ -540,8 +540,6 @@ webbrowser.open(viewer_url)
 
 The method automatically selects OHIF v3 for radiology or SLIM for slide microscopy. Viewing by study is useful when a DICOM Study contains multiple Series (e.g., T1, T2, DWI sequences from a single MRI session).
 
-See `references/idc_portal_guide.md` for additional visualization options.
-
 ### 5. Understanding and Checking Licenses
 
 Check data licensing before use (critical for commercial applications):
@@ -672,9 +670,9 @@ See `references/bigquery_guide.md` for setup, table schemas, query patterns, and
 | Task | Tool | Reference |
 |------|------|-----------|
 | Programmatic queries & downloads | `idc-index` | This document |
-| Interactive exploration | IDC Portal | `references/idc_portal_guide.md` |
+| Interactive exploration | IDC Portal | https://portal.imaging.datacommons.cancer.gov/ |
 | Complex metadata queries | BigQuery | `references/bigquery_guide.md` |
-| 3D visualization & analysis | SlicerIDCBrowser | `references/idc_portal_guide.md` |
+| 3D visualization & analysis | SlicerIDCBrowser | https://github.com/ImagingDataCommons/SlicerIDCBrowser |
 
 **Default choice:** Use `idc-index` for most tasks (no auth, easy API, batch downloads).
 
@@ -859,7 +857,7 @@ for _, row in series_list.iterrows():
     # webbrowser.open(viewer_url)  # Uncomment to open automatically
 ```
 
-See `references/idc_portal_guide.md` for additional visualization options.
+For additional visualization options, see the [IDC Portal getting started guide](https://learn.canceridc.dev/portal/getting-started) or [SlicerIDCBrowser](https://github.com/ImagingDataCommons/SlicerIDCBrowser) for 3D Slicer integration.
 
 ### Use Case 4: License-Aware Batch Download for Commercial Use
 
@@ -1047,6 +1045,25 @@ client.sql_query("""
 """)
 ```
 
+## Related Skills
+
+The following skills complement IDC workflows for downstream analysis and visualization:
+
+### DICOM Processing
+- **pydicom** - Read, write, and manipulate downloaded DICOM files. Use for extracting pixel data, reading metadata, anonymization, and format conversion. Essential for working with IDC radiology data (CT, MR, PET).
+
+### Pathology and Slide Microscopy
+- **histolab** - Lightweight tile extraction and preprocessing for whole slide images. Use for basic slide processing, tissue detection, and dataset preparation from IDC slide microscopy data.
+- **pathml** - Full-featured computational pathology toolkit. Use for advanced WSI analysis including multiplexed imaging, nucleus segmentation, and ML model training on pathology data downloaded from IDC.
+
+### Metadata Visualization
+- **matplotlib** - Low-level plotting for full customization. Use for creating static figures summarizing IDC query results (bar charts of modalities, histograms of series counts, etc.).
+- **seaborn** - Statistical visualization with pandas integration. Use for quick exploration of IDC metadata distributions, relationships between variables, and categorical comparisons with attractive defaults.
+- **plotly** - Interactive visualization. Use when you need hover info, zoom, and pan for exploring IDC metadata, or for creating web-embeddable dashboards of collection statistics.
+
+### Data Exploration
+- **exploratory-data-analysis** - Comprehensive EDA on scientific data files. Use after downloading IDC data to understand file structure, quality, and characteristics before analysis.
+
 ## Resources
 
 ### Schema Reference (Primary Source)
@@ -1061,12 +1078,10 @@ columns = [(c['name'], c['type'], c.get('description', '')) for c in schema['col
 
 ### Reference Documentation
 
-- **idc_index_api.md** - Complete idc-index Python API reference with all methods and parameters
 - **bigquery_guide.md** - Advanced BigQuery usage guide for complex metadata queries
 - **dicomweb_guide.md** - DICOMweb endpoint URLs, code examples, and Google Healthcare API implementation details
-- **idc_portal_guide.md** - IDC Portal, visualization options, and SlicerIDCBrowser
 - **metadata_schema.md** - IDC data hierarchy and metadata field documentation
-- **[indices_reference](https://idc-index.readthedocs.io/en/latest/indices_reference.html)** - External documentation for index tables (may lag behind installed version)
+- **[indices_reference](https://idc-index.readthedocs.io/en/latest/indices_reference.html)** - External documentation for index tables (may be ahead of the installed version)
 
 ### External Links
 

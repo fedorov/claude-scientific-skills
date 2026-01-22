@@ -1,43 +1,51 @@
 # BigQuery Guide for IDC
 
+**Tested with:** IDC data version v23
+
+For most queries and downloads, use `idc-index` (see main SKILL.md). This guide covers BigQuery for advanced use cases requiring full DICOM metadata or complex joins.
+
 ## Prerequisites
 
-**Important:** BigQuery requires:
+**Requirements:**
 1. Google account
-2. Google Cloud project with billing enabled
-3. This is a barrier for beginners - recommend `idc-index` first
+2. Google Cloud project with billing enabled (first 1 TB/month free)
+3. `google-cloud-bigquery` Python package or BigQuery console access
 
-For most use cases, `idc-index` is sufficient and requires no setup.
+**Authentication setup:**
+```bash
+# Install Google Cloud SDK, then:
+gcloud auth application-default login
+```
 
 ## When to Use BigQuery
 
-Use BigQuery when you need:
-- Complex metadata queries beyond mini-index capabilities
-- Full DICOM metadata (all tags)
-- Clinical data tables
-- Advanced joins across multiple tables
-- Large-scale data analysis
+Use BigQuery instead of `idc-index` when you need:
+- Full DICOM metadata (all 4000+ tags, not just the ~50 in idc-index)
+- Complex joins across clinical data tables
+- DICOM sequence attributes (nested structures)
+- Queries on fields not in the idc-index mini-index
 
 ## Accessing IDC in BigQuery
 
 ### Dataset Structure
 
-All IDC tables are in the `bigquery-public-data` project.
+All IDC tables are in the `bigquery-public-data` BigQuery project.
 
 **Current version (recommended for exploration):**
 - `bigquery-public-data.idc_current.*`
 - `bigquery-public-data.idc_current_clinical.*`
 
 **Versioned datasets (recommended for reproducibility):**
-- `bigquery-public-data.idc_v16.*` (example for v16)
-- `bigquery-public-data.idc_v16_clinical.*`
+
+- `bigquery-public-data.idc_v{IDC version}.*`
+- `bigquery-public-data.idc_v{IDC version}_clinical.*`
 
 Always use versioned datasets for reproducible research!
 
 ## Key Tables
 
 ### dicom_all
-Primary table combining DICOM metadata with auxiliary metadata.
+Primary table joining complete DICOM metadata with IDC-specific columns (collection_id, gcs_url, license). Contains all DICOM tags from `dicom_metadata` plus collection and administrative metadata. See [dicom_all.sql](https://github.com/ImagingDataCommons/etl_flow/blob/master/bq/generate_tables_and_views/derived_tables/BQ_Table_Building/derived_data_views/sql/dicom_all.sql) for the exact derivation.
 
 ```sql
 SELECT 
@@ -53,41 +61,6 @@ SELECT
 FROM `bigquery-public-data.idc_current.dicom_all`
 WHERE Modality = 'CT'
   AND BodyPartExamined = 'CHEST'
-LIMIT 10
-```
-
-### dicom_metadata
-Complete DICOM metadata for all instances.
-
-Contains ALL DICOM tags, including sequences and complex attributes.
-
-```sql
-SELECT 
-  SOPInstanceUID,
-  SeriesInstanceUID,
-  Manufacturer,
-  ManufacturerModelName,
-  KVP,
-  Exposure
-FROM `bigquery-public-data.idc_current.dicom_metadata`
-WHERE Modality = 'CT'
-LIMIT 10
-```
-
-### auxiliary_metadata
-Non-DICOM metadata about collections, versions, licenses, URLs.
-
-```sql
-SELECT
-  collection_id,
-  SOPInstanceUID,
-  gcs_url,
-  aws_url,
-  license_short_name,
-  license_url,
-  instance_size
-FROM `bigquery-public-data.idc_current.auxiliary_metadata`
-WHERE collection_id = 'tcga_luad'
 LIMIT 10
 ```
 
@@ -109,16 +82,17 @@ LIMIT 10
 **original_collections_metadata** - Collection-level descriptions
 
 ```sql
-SELECT 
+SELECT
   collection_id,
-  CancerType,
+  CancerTypes,
+  TumorLocations,
   Subjects,
-  ImageType,
-  Description,
-  DOI,
-  license_short_name
-FROM `bigquery-public-data.idc_current.original_collections_metadata`
-WHERE CancerType LIKE '%Lung%'
+  src.source_doi,
+  src.ImageTypes,
+  src.license.license_short_name
+FROM `bigquery-public-data.idc_current.original_collections_metadata`,
+UNNEST(Sources) AS src
+WHERE CancerTypes LIKE '%Lung%'
 ```
 
 ## Common Query Patterns
@@ -144,9 +118,9 @@ ORDER BY patient_count DESC
 SELECT
   SeriesInstanceUID,
   gcs_url
-FROM `bigquery-public-data.idc_current.dicom_all`  
+FROM `bigquery-public-data.idc_current.dicom_all`
 WHERE collection_id = 'rider_pilot'
-  AND Modality = 'MR'
+  AND Modality = 'CT'
 ```
 
 ### Find Studies with Multiple Modalities
@@ -170,7 +144,7 @@ SELECT
   license_short_name,
   COUNT(*) as instance_count
 FROM `bigquery-public-data.idc_current.dicom_all`
-WHERE license_short_name = 'CC-BY'
+WHERE license_short_name = 'CC BY 4.0'
 GROUP BY collection_id, license_short_name
 ```
 
@@ -178,78 +152,107 @@ GROUP BY collection_id, license_short_name
 
 ```sql
 SELECT
-  seg.collection_id,
+  src.collection_id,
   seg.SeriesInstanceUID as seg_series,
-  seg.segmentedPropertyTypeCodeMeaning,
+  seg.SegmentedPropertyType,
   src.SeriesInstanceUID as source_series,
   src.Modality as source_modality
 FROM `bigquery-public-data.idc_current.segmentations` seg
 JOIN `bigquery-public-data.idc_current.dicom_all` src
-  ON seg.ReferencedSeriesInstanceUID = src.SeriesInstanceUID
-WHERE seg.collection_id = 'qin_prostate_repeatability'
+  ON seg.segmented_SeriesInstanceUID = src.SeriesInstanceUID
+WHERE src.collection_id = 'qin_prostate_repeatability'
 LIMIT 10
 ```
 
 ## Using Query Results with idc-index
 
-Combine BigQuery queries with idc-index for downloads:
+Combine BigQuery for complex queries with idc-index for downloads (no GCP auth needed for downloads):
 
 ```python
 from google.cloud import bigquery
 from idc_index import IDCClient
 
-# Query with BigQuery
-bq_client = bigquery.Client()
+# Initialize BigQuery client
+# Requires: pip install google-cloud-bigquery
+# Auth: gcloud auth application-default login
+# Project: needed for billing even on public datasets (free tier applies)
+bq_client = bigquery.Client(project="your-gcp-project-id")
+
+# Query for series with specific criteria
 query = """
-SELECT SeriesInstanceUID
+SELECT DISTINCT SeriesInstanceUID
 FROM `bigquery-public-data.idc_current.dicom_all`
 WHERE collection_id = 'tcga_luad'
   AND Modality = 'CT'
+  AND Manufacturer = 'GE MEDICAL SYSTEMS'
 LIMIT 100
 """
 
 df = bq_client.query(query).to_dataframe()
+print(f"Found {len(df)} GE CT series")
 
-# Download with idc-index
+# Download with idc-index (no GCP auth required)
 idc_client = IDCClient()
 idc_client.download_from_selection(
     seriesInstanceUID=list(df['SeriesInstanceUID'].values),
-    downloadDir="./tcga_luad_ct"
+    downloadDir="./tcga_luad_thin_ct"
 )
 ```
 
-## Cost Considerations
+## Cost and Optimization
 
-BigQuery charges for:
-1. Data processed by queries (not data returned)
-2. Storage (minimal for querying public datasets)
+**Pricing:** $5 per TB scanned (first 1 TB/month free). Most users stay within free tier.
 
-**Cost-saving tips:**
-- Use `LIMIT` during development
-- Select only needed columns
-- Use table previews in BQ console (free)
-- Filter early in queries
-- Use `dicom_all` instead of `dicom_metadata` when possible (smaller table)
+**Minimize data scanned:**
+- Select only needed columns (not `SELECT *`)
+- Filter early with `WHERE` clauses
+- Use `LIMIT` when testing
+- Use `dicom_all` instead of `dicom_metadata` when possible (smaller)
+- Preview queries in BQ console (free, shows bytes to scan)
 
-Typical query costs: $0.05-$1.00 for moderate queries
+**Check cost before running:**
+```python
+query_job = client.query(query, job_config=bigquery.QueryJobConfig(dry_run=True))
+print(f"Query will scan {query_job.total_bytes_processed / 1e9:.2f} GB")
+```
 
-## Views vs Tables
-
-IDC provides both views and materialized tables:
-- `table_name_view` - BQ view (runs query each time)
-- `table_name` - Materialized table (faster, lower cost)
-
-Always use materialized tables unless you need to see the query logic.
+**Use materialized tables:** IDC provides both views (`table_name_view`) and materialized tables (`table_name`). Always use the materialized tables (faster, lower cost).
 
 ## Clinical Data
 
-Clinical data is in separate datasets:
+Clinical data is in separate datasets with collection-specific tables. Not all collections have clinical data (started in IDC v11).
+
+**List available clinical tables:**
 ```sql
-SELECT *
-FROM `bigquery-public-data.idc_current_clinical.*`
+SELECT table_name
+FROM `bigquery-public-data.idc_current_clinical.INFORMATION_SCHEMA.TABLES`
 ```
 
-Not all collections have clinical data. Started in IDC v11.
+**Query clinical data for a collection:**
+```sql
+-- Example: TCGA-LUAD clinical data
+SELECT *
+FROM `bigquery-public-data.idc_current_clinical.tcga_luad_clinical`
+LIMIT 10
+```
+
+**Join clinical with imaging data:**
+```sql
+SELECT
+  d.PatientID,
+  d.SeriesInstanceUID,
+  d.Modality,
+  c.age_at_diagnosis,
+  c.pathologic_stage
+FROM `bigquery-public-data.idc_current.dicom_all` d
+JOIN `bigquery-public-data.idc_current_clinical.tcga_luad_clinical` c
+  ON d.PatientID = c.dicom_patient_id
+WHERE d.collection_id = 'tcga_luad'
+  AND d.Modality = 'CT'
+LIMIT 20
+```
+
+**Note:** Clinical table schemas vary by collection. Check column names with `INFORMATION_SCHEMA.COLUMNS` before querying.
 
 ## Important Notes
 
@@ -259,21 +262,6 @@ Not all collections have clinical data. Started in IDC v11.
 - Some DICOM sequences >15 levels deep are not extracted
 - Very large sequences (>1MB) may be truncated
 - Always check data license before use
-
-## Query Optimization Tips
-
-**Cost Optimization:**
-- Use `SELECT` only the columns you need (not `SELECT *`)
-- Filter early with `WHERE` clauses to reduce data scanned
-- Use `LIMIT` when testing queries
-- Check query cost before running: `client.query(query).total_bytes_processed`
-- Use clustering and partitioning features when available
-
-**Performance Optimization:**
-- Use materialized tables instead of views
-- Avoid complex JOIN operations when possible
-- Pre-filter data before JOINs
-- Use approximate aggregation functions when exact counts aren't needed
 
 ## Common Errors
 
@@ -292,17 +280,3 @@ Not all collections have clinical data. Started in IDC v11.
 **Issue: Permission denied**
 - Cause: Not authenticated to Google Cloud
 - Solution: Run `gcloud auth application-default login` or set GOOGLE_APPLICATION_CREDENTIALS
-
-## Cost Estimation
-
-BigQuery charges for data scanned:
-- First 1 TB per month: Free
-- After that: $5 per TB scanned
-- Storage: $0.02 per GB per month (unlikely to apply for read-only access)
-
-**Example costs:**
-- Simple query scanning 10 GB: Free (under 1 TB monthly limit)
-- Complex query scanning 500 GB: Free (under 1 TB monthly limit)
-- Multiple queries totaling 2 TB in a month: ~$5
-
-**Tip:** Most users stay within free tier limits with careful query design.

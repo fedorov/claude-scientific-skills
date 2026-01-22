@@ -152,10 +152,8 @@ Contains executable helper scripts:
 - Schema discovery via `client.indices_overview`
 
 ### Reference Files
-- `references/idc_index_api.md` - Python API reference
 - `references/bigquery_guide.md` - Advanced queries
 - `references/dicomweb_guide.md` - DICOMweb endpoints
-- `references/idc_portal_guide.md` - Portal and visualization
 - `references/metadata_schema.md` - Data hierarchy
 
 ## Development Workflow
