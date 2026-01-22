@@ -260,6 +260,10 @@ See `references/dicomweb_guide.md` for endpoint URLs, code examples, supported o
 pip install --upgrade idc-index
 ```
 
+**Important:** New IDC data release will always trigger a new version of `idc-index`. Always use `--upgrade` flag while installing, unless an older version is needed for reproducibility.
+
+**Tested with:** idc-index 0.11.5 (IDC data version v23)
+
 **Optional (for data analysis):**
 ```bash
 pip install pandas numpy pydicom
@@ -909,6 +913,7 @@ cc_by_data.to_csv('commercial_dataset_manifest_CC-BY_ONLY.csv', index=False)
 - **Estimate size first** - Check collection size before downloading - some collection sizes are in terabytes!
 - **Save manifests** - Always save query results with Series UIDs for reproducibility and data provenance
 - **Read documentation** - IDC data structure and metadata fields are documented at https://learn.canceridc.dev/
+- **Use IDC forum** - Search for questons/answers and ask your questions to the IDC maintainers and users at https://discourse.canceridc.dev/
 
 ## Troubleshooting
 
@@ -938,72 +943,108 @@ cc_by_data.to_csv('commercial_dataset_manifest_CC-BY_ONLY.csv', index=False)
 **Issue: Downloaded DICOM files won't open**
 - **Cause:** Corrupted download or incompatible viewer
 - **Solution:**
+  - Check DICOM object type (Modality and SOPClassUID attributes) - some object types require specialized tools
   - Verify file integrity (check file sizes)
   - Use pydicom to validate: `pydicom.dcmread(file, force=True)`
-  - Try different DICOM viewer (3D Slicer, Horos, RadiAnt)
+  - Try different DICOM viewer (3D Slicer, Horos, RadiAnt, QuPath)
   - Re-download the series
 
 ## Common SQL Query Patterns
 
-Use `client.sql_query()` with these patterns for common search tasks:
+Quick reference for common queries. For detailed examples with context, see the Core Capabilities section above.
 
-### Search by cancer type (requires join with collections_index)
+### Discover available filter values
 ```python
-client.fetch_index("collections_index")
+# What modalities exist?
+client.sql_query("SELECT DISTINCT Modality FROM index")
+
+# What body parts for a specific modality?
 client.sql_query("""
-    SELECT i.collection_id, i.PatientID, i.SeriesInstanceUID, i.Modality, i.SeriesDescription
-    FROM index i
-    JOIN collections_index c ON i.collection_id = c.collection_id
-    WHERE c.CancerTypes LIKE '%Breast%' AND i.Modality = 'MR'
-    LIMIT 100
+    SELECT DISTINCT BodyPartExamined, COUNT(*) as n
+    FROM index WHERE Modality = 'CT' AND BodyPartExamined IS NOT NULL
+    GROUP BY BodyPartExamined ORDER BY n DESC
+""")
+
+# What manufacturers for MR?
+client.sql_query("""
+    SELECT DISTINCT Manufacturer, COUNT(*) as n
+    FROM index WHERE Modality = 'MR'
+    GROUP BY Manufacturer ORDER BY n DESC
 """)
 ```
 
-### Search by modality and body part
+### Find annotations and segmentations
+
+**Note:** Not all image-derived objects belong to analysis result collections. Some annotations are deposited alongside original images. Use DICOM Modality or SOPClassUID to find all derived objects regardless of collection type.
+
 ```python
+# Find ALL segmentations and structure sets by DICOM Modality
+# SEG = DICOM Segmentation, RTSTRUCT = Radiotherapy Structure Set
 client.sql_query("""
-    SELECT collection_id, PatientID, SeriesInstanceUID, BodyPartExamined
+    SELECT collection_id, Modality, COUNT(*) as series_count
     FROM index
-    WHERE Modality = 'CT' AND BodyPartExamined LIKE '%LUNG%'
-    LIMIT 100
+    WHERE Modality IN ('SEG', 'RTSTRUCT')
+    GROUP BY collection_id, Modality
+    ORDER BY series_count DESC
+""")
+
+# Find segmentations for a specific collection (includes non-analysis-result items)
+client.sql_query("""
+    SELECT SeriesInstanceUID, SeriesDescription, analysis_result_id
+    FROM index
+    WHERE collection_id = 'tcga_luad' AND Modality = 'SEG'
+""")
+
+# List analysis result collections (curated derived datasets)
+client.fetch_index("analysis_results_index")
+client.sql_query("""
+    SELECT analysis_result_id, analysis_result_title, Collections, Modalities
+    FROM analysis_results_index
+""")
+
+# Find analysis results for a specific source collection
+client.sql_query("""
+    SELECT analysis_result_id, analysis_result_title
+    FROM analysis_results_index
+    WHERE Collections LIKE '%tcga_luad%'
 """)
 ```
 
-### Get collections summary
+### Query slide microscopy data
 ```python
+# sm_index has detailed metadata; join with index for collection_id
+client.fetch_index("sm_index")
 client.sql_query("""
-    SELECT collection_id,
-           COUNT(DISTINCT PatientID) as num_patients,
-           COUNT(DISTINCT SeriesInstanceUID) as num_series,
-           license_short_name
-    FROM index
-    GROUP BY collection_id, license_short_name
-    ORDER BY num_patients DESC
-""")
-```
-
-### Check licenses for a collection
-```python
-client.sql_query("""
-    SELECT DISTINCT collection_id, license_short_name, license_url
-    FROM index
-    WHERE collection_id = 'tcga_luad'
+    SELECT i.collection_id, COUNT(*) as slides,
+           MIN(s.min_PixelSpacing_2sf) as min_resolution
+    FROM sm_index s
+    JOIN index i ON s.SeriesInstanceUID = i.SeriesInstanceUID
+    GROUP BY i.collection_id
+    ORDER BY slides DESC
 """)
 ```
 
 ### Estimate download size
 ```python
-# Query for aggregate size across series (recommended)
+# Size for specific criteria
 client.sql_query("""
-    SELECT collection_id, SUM(series_size_MB) as total_mb
+    SELECT SUM(series_size_MB) as total_mb, COUNT(*) as series_count
     FROM index
-    WHERE collection_id = 'rider_pilot'
-    GROUP BY collection_id
+    WHERE collection_id = 'nlst' AND Modality = 'CT'
 """)
+```
 
-# Or use get_series_size() for individual series from query results
-series = client.sql_query("SELECT SeriesInstanceUID FROM index WHERE collection_id = 'rider_pilot' LIMIT 1")
-size_mb = client.get_series_size(seriesInstanceUID=series.iloc[0]['SeriesInstanceUID'])
+### Link to clinical data
+```python
+client.fetch_index("clinical_index")
+
+# Find collections with clinical data and their tables
+client.sql_query("""
+    SELECT collection_id, table_name, COUNT(DISTINCT column_label) as columns
+    FROM clinical_index
+    GROUP BY collection_id, table_name
+    ORDER BY collection_id
+""")
 ```
 
 ## Resources
