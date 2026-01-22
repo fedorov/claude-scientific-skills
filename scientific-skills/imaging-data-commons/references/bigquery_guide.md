@@ -280,3 +280,10 @@ LIMIT 20
 **Issue: Permission denied**
 - Cause: Not authenticated to Google Cloud
 - Solution: Run `gcloud auth application-default login` or set GOOGLE_APPLICATION_CREDENTIALS
+
+## Resources
+
+- [Understanding the BigQuery DICOM schema](https://docs.cloud.google.com/healthcare-api/docs/how-tos/dicom-bigquery-schema)
+- [BigQuery Query Syntax](https://docs.cloud.google.com/bigquery/docs/reference/standard-sql/query-syntax)
+- [Kaggle Intro to SQL](https://www.kaggle.com/learn/intro-to-sql)
+- [Sample BigQuery queries of IDC data](https://github.com/ImagingDataCommons/idc-bigquery-cookbook)

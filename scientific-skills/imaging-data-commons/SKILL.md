@@ -1,7 +1,7 @@
 ---
 name: imaging-data-commons
-description: Publicly available cancer imaging, image-derived data (annotations, features) in DICOM format, and various tools to explore, subset, visualize and access the data. Images available are contributed by large data collection initiatives, such as TCGA, CPTAC, CCDI, GETex, and individual investigators. Use when you want to find data to train new image analysis tools, explore hypotheses correlating imaging data with other data types, test existing tools. Query using rich metadata, download, visualize in browser, check licenses. For processing downloaded DICOM files use pydicom; for pathology slide analysis use histolab or pathml; for metadata visualization use matplotlib, seaborn, or plotly.
-license: Unknown
+description: Query and download public cancer imaging data from NCI Imaging Data Commons using idc-index. Use for accessing large-scale radiology (CT, MR, PET) and pathology datasets for AI training or research. No authentication required. Query by metadata, visualize in browser, check licenses.
+license: This skill is provided under the MIT License. IDC data itself has individual licensing (mostly CC-BY, some CC-NC) that must be respected when using the data.
 metadata:
     skill-author: Andrey Fedorov, @fedorov
 ---
